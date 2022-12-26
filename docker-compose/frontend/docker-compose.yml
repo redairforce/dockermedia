@@ -1,0 +1,152 @@
+---
+version: "3"
+services:
+  swag:
+#   https://docs.linuxserver.io/general/swag  
+    image: ghcr.io/linuxserver/swag:latest
+    container_name: swag
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - DHLEVEL=2048
+      - URL=<your full domain name here>
+      - SUBDOMAINS=<any and all subdomains required>
+      - VALIDATION=DNS
+      - DNSPLUGIN=cloudflare
+      - ONLY_SUBDOMAINS=true
+      - STAGING=false
+    volumes:
+      - /docker/encrypted/swag:/config
+ #    After you create the container, open "/swag/dns-conf/cloudflare.ini" and populate with your email and api_key
+      - /docker/encrypted/organizr/www/db:/organizrlog
+      - /docker/encrypted/radarr/logs:/radarrlog
+      - /docker/encrypted/sonarr/logs:/sonarrlog
+      - /docker/encrypted/overseerr/config/logs:/overseerrlog
+    ports:
+      - 443:443
+    networks:
+      - frontend
+  organizr:
+#   https://docs.organizr.app/installation/installing-organizr
+    image: organizr/organizr
+    container_name: organizr
+    volumes:
+     - /docker/encrypted/organizr:/config
+    environment:
+     - PGID=1000
+     - PUID=1000
+     - branch=v2-master
+    ports:
+      - 80:80
+    networks:
+      - frontend
+  tautulli:
+#   https://github.com/Tautulli/Tautulli  
+    image: tautulli/tautulli
+    container_name: tautulli
+    volumes:
+      - /docker/encrypted/tautulli:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    ports:
+      - 8181:8181
+    networks:
+      - frontend
+  radarr:
+#   https://docs.linuxserver.io/images/docker-radarr
+    image: lscr.io/linuxserver/radarr:nightly
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/radarr:/config
+      - /storage/encrypted/video/movies:/movies
+      - /downloads/encrypted:/downloads
+    ports:
+      - 7878:7878
+    networks:
+      - frontend
+  sonarr:
+#   https://docs.linuxserver.io/images/docker-sonarr
+    image: linuxserver/sonarr:develop-version-4.0.0.255
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/sonarr:/config
+      - /storage/encrypted/video/tv:/tv
+      - /downloads/encrypted:/downloads
+    ports:
+      - 8989:8989
+    networks:
+      - frontend
+  bazarr:
+#   https://docs.linuxserver.io/images/docker-bazarr  
+    image: lscr.io/linuxserver/bazarr:development
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/bazarr:/config
+      - /storage/encrypted/video/movies:/movies
+      - /storage/encrypted/video/tv:/tv
+    ports:
+      - 6767:6767
+    networks:
+      - frontend
+  overseerr:
+#   https://docs.overseerr.dev/getting-started/installation
+    image: sctx/overseerr:latest
+    container_name: overseerr
+    environment:
+    - LOG_LEVEL=debug
+    - TZ=America/Chicago
+    ports:
+    - 5055:5055
+    volumes:
+    - /docker/encrypted/overseerr/config:/app/config
+    networks:
+      - frontend
+  cloudflareddns:
+#   https://hotio.dev/containers/cloudflareddns/
+    container_name: cloudflareddns
+    image: hotio/cloudflareddns
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/Chicago
+      - INTERVAL=300
+      - DETECTION_MODE=dig-whoami.cloudflare
+      - LOG_LEVEL=3
+      - cloudflareddns
+      - CF_USER=<cloudflare email>
+      - CF_APIKEY=<cloudflare api>
+      - CF_APITOKEN
+      - CF_APITOKEN_ZONE
+      - CF_HOSTS=<all subdomains you expect to keep updated "plex.me.com,". If this is also your webserver for @domain "me.com", then list this here. 
+      - CF_ZONES=<write your domain here "me.com">
+      - CF_RECORDTYPES=A;A;AAAA
+    volumes:
+      - /docker/encrypted/cloudflare-ddns:/config
+    networks:
+      - frontend
+networks:   
+  frontend:
+      driver: bridge
+      ipam:
+          driver: default
+          config:
+              - subnet: "172.20.0.0/24"
+                gateway: "172.20.0.1"
