@@ -1,0 +1,104 @@
+version: "3"
+services:
+  vpn:
+# https://github.com/bubuntux/nordlynx
+    image: ghcr.io/bubuntux/nordlynx:edge
+    container_name: vpn
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PRIVATE_KEY=<enter your private key>
+      - END_POINT=<selected server>.nordvpn.com:51820
+      - PUBLIC_KEY=<public key to server>
+      - PERSISTENT_KEEP_ALIVE=25
+      - RECONNECT=43200
+      - NET_LOCAL=172.17.0.0/16,172.20.0.0/16.172.21.0.0/16
+      - TZ=America/Chicago
+    ports:
+      - 9696:9696
+      - 6881:6881
+      - 6881:6881/udp
+      - 8081:8081
+      - 6789:6789
+      - 34400:34400
+      - 5800:5800
+    networks:
+      - backend
+  firefox:
+# https://github.com/jlesage/docker-firefox  
+    image: jlesage/firefox
+    container_name: firefox
+    volumes:
+      - /docker/firefox:/config:rw
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+  threadfin:
+#   https://github.com/Threadfin/Threadfin
+    image: fyb3roptik/threadfin:latest
+    container_name: threadfin
+    environment:
+      - TZ=America/Chicago
+      - THREADFIN_DEBUG=0
+      - THREADFIN_BRANCH=main
+      - THREADFIN_UID=0
+      - THREADFIN_USER=root
+    volumes:
+      - /tmp/ramdisk:/tmp/threadfin:rw
+      - /docker/encrypted/threadfin/conf:/home/threadfin/conf:rw
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+  nzbget:
+#   https://docs.linuxserver.io/images/docker-nzbget
+    image: lscr.io/linuxserver/nzbget
+    container_name: nzbget
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/nzbget:/config
+      - /downloads/encrypted:/downloads
+    cpus: 2
+# When nzbget is unraring a large file, it can max out CPU usage and mess-up playback for Plex 
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+  qbittorrent:
+#   https://docs.linuxserver.io/images/docker-qbittorrent  
+    image: lscr.io/linuxserver/qbittorrent
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - WEBUI_PORT=8081
+#     Specifying webport as 8081 as there are other servers that can use this port. Remember to correct this in Swag.      
+    volumes:
+      - /docker/encrypted/qbittorrent:/config
+      - /downloads/encrypted:/downloads
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+  prowlarr:
+#   https://fleet.linuxserver.io/image?name=linuxserver/prowlarr  
+    image: ghcr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/prowlarr/config:/config
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+networks:
+  backend:
+      driver: bridge
+      ipam:
+          driver: default
+          config:
+              - subnet: "172.21.0.0/24"
+                gateway: "172.21.0.1"
