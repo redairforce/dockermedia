@@ -37,9 +37,8 @@ services:
       - 443:443
     networks:
       internal:
-      outside:
+      external:
           ipv4_address: 10.0.0.3
-      plex:
 
   organizr:
     image: organizr/organizr
@@ -54,6 +53,7 @@ services:
       - 80:80
     networks:
       internal:
+      
   podgrab:
     image: akhilrex/podgrab
     container_name: podgrab
@@ -67,6 +67,7 @@ services:
       - 8086:8080
     networks:
       internal:
+      
   tautulli:
     image: tautulli/tautulli
     container_name: tautulli
@@ -80,6 +81,7 @@ services:
       - 8181:8181
     networks:
       internal:
+      
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -94,6 +96,7 @@ services:
       - 9000:9000
     networks:
       internal:
+      
   radarr:
     image: lscr.io/linuxserver/radarr:nightly
     container_name: radarr
@@ -110,6 +113,7 @@ services:
     restart: always
     networks:
       internal:
+      
   sonarr:
     image: lscr.io/linuxserver/sonarr:develop
     container_name: sonarr
@@ -125,6 +129,7 @@ services:
       - 8989:8989
     networks:
       internal:
+      
   bazarr:
     image: lscr.io/linuxserver/bazarr:development
     container_name: bazarr
@@ -140,6 +145,7 @@ services:
       - 6767:6767
     networks:
       internal:
+      
   cloudflareddns:
     container_name: cloudflareddns
     image: cr.hotio.dev/hotio/cloudflareddns
@@ -165,6 +171,7 @@ services:
     depends_on:
       - cloudflared
     network_mode: service:cloudflared
+    
   emby:
     image: lscr.io/linuxserver/emby:latest
     container_name: emby
@@ -210,7 +217,7 @@ networks:
       config:
         - subnet: "172.20.0.0/24"
 
-  outside:
+  external:
     driver: macvlan
     enable_ipv6: true
     driver_opts:
@@ -221,9 +228,3 @@ networks:
         - subnet: 2001:db8:2::/64
         - subnet: 10.0.0.0/24
           gateway: 10.0.0.1
-
-  plex:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: "172.23.1.0/24"
