@@ -1,0 +1,229 @@
+version: "3.9"
+services:
+  cloudflared:
+    image: hostcloudflared
+    container_name: cloudflared
+    command: ["cloudflared", "tunnel", "--no-autoupdate", "run", "--token", "******************************"]
+    privileged: true
+    networks:
+      internal:
+      outside:
+          ipv4_address: 10.0.0.4
+  swag:
+    image: ghcr.io/linuxserver/swag:latest
+    container_name: swag
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - MAXMINDDB_LICENSE_KEY=**************
+      - DHLEVEL=2048
+      - URL=williamchambless.com
+      - SUBDOMAINS=*************************
+      - VALIDATION=DNS
+      - DNSPLUGIN=cloudflare
+      - EMAIL=********************
+      - ONLY_SUBDOMAINS=true
+      - STAGING=false
+    volumes:
+      - /docker/encrypted/swag:/config
+      - /docker/encrypted/organizr/www/db:/organizrlog
+      - /docker/encrypted/radarr/logs:/radarrlog
+      - /docker/encrypted/sonarr/logs:/sonarrlog
+      - /docker/encrypted/overseerr/config/logs:/overseerrlog
+    ports:
+      - 443:443
+    networks:
+      internal:
+      outside:
+          ipv4_address: 10.0.0.3
+      plex:
+
+  organizr:
+    image: organizr/organizr
+    container_name: organizr
+    volumes:
+     - /docker/encrypted/organizr:/config
+    environment:
+     - PGID=1000
+     - PUID=1000
+     - branch=v2-master
+    ports:
+      - 80:80
+    networks:
+      internal:
+  podgrab:
+    image: akhilrex/podgrab
+    container_name: podgrab
+    environment:
+      - CHECK_FREQUENCY=240
+      - PASSWORD=**********************
+    volumes:
+      - /docker/encrypted/podgrag/config:/config
+      - /docker/encrypted/podgrab/assets:/assets
+    ports:
+      - 8086:8080
+    networks:
+      internal:
+  tautulli:
+    image: tautulli/tautulli
+    container_name: tautulli
+    volumes:
+      - /docker/encrypted/tautulli:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    ports:
+      - 8181:8181
+    networks:
+      internal:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./portainer-data:/data
+    ports:
+      - 9000:9000
+    networks:
+      internal:
+  radarr:
+    image: lscr.io/linuxserver/radarr:nightly
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/radarr:/config
+      - /storage/encrypted/video/movies:/movies
+      - /downloads/encrypted:/downloads
+    ports:
+      - 7878:7878
+    restart: always
+    networks:
+      internal:
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:develop
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/sonarr:/config
+      - /storage/encrypted/video/tv:/tv
+      - /downloads/encrypted:/downloads
+    ports:
+      - 8989:8989
+    networks:
+      internal:
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:development
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /docker/encrypted/bazarr:/config
+      - /storage/encrypted/video/movies:/movies
+      - /storage/encrypted/video/tv:/tv
+    ports:
+      - 6767:6767
+    networks:
+      internal:
+  cloudflareddns:
+    container_name: cloudflareddns
+    image: cr.hotio.dev/hotio/cloudflareddns
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/Chicago
+      - INTERVAL=300
+      - DETECTION_MODE=dig-whoami.cloudflare
+      - LOG_LEVEL=3
+      - cloudflareddns
+      - CF_USER=******************
+      - CF_APIKEY=*********************
+      - CF_APITOKEN
+      - CF_APITOKEN_ZONE
+      - CF_HOSTS=***************************
+      - CF_ZONES=**********************
+      - CF_RECORDTYPES=A;A;AAAA
+    volumes:
+      - /docker/encrypted/cloudflare-ddns:/config
+    restart: always
+    depends_on:
+      - cloudflared
+    network_mode: service:cloudflared
+  emby:
+    image: lscr.io/linuxserver/emby:latest
+    container_name: emby
+    runtime: nvidia
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - /docker/encrypted/library:/config
+      - /storage/encrypted/video/tv:/data/tvshows
+      - /storage/encrypted/video/movies:/data/movies
+    ports:
+      - 8096:8096
+      - 8920:8920 #optional
+    restart: unless-stopped
+    networks:
+      internal:
+
+  plex-meta-manager:
+    image: lscr.io/linuxserver/plex-meta-manager:latest
+    container_name: plex-meta-manager
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PMM_CONFIG=/config/config.yml
+      - PMM_TIME=03:00
+      - PMM_RUN=False #optional
+      - PMM_TEST=False #optional
+      - PMM_NO_MISSING=False #optional
+    volumes:
+      - /docker/encrypted/plexmetadata:/config
+    restart: unless-stopped
+    networks:
+      internal:
+
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.20.0.0/24"
+
+  outside:
+    driver: macvlan
+    enable_ipv6: true
+    driver_opts:
+      parent: enp5s0
+      macvlan_mode: bridge
+    ipam:
+      config:
+        - subnet: 2001:db8:2::/64
+        - subnet: 10.0.0.0/24
+          gateway: 10.0.0.1
+
+  plex:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.23.1.0/24"

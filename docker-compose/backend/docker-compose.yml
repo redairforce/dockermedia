@@ -1,0 +1,154 @@
+version: '3.9'
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "ping", "8.8.8.8", "-c", "1"]
+      interval: 1m30s
+      timeout: 3s
+      retries: 5
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    ports:
+      - 8099:8099
+      - 9696:9696
+      - 8081:8081
+      - 6789:6789
+      - 5800:5800
+      - 3000:3000
+      - 3001:3001
+      - 8090:8090      
+    environment:
+      - WIREGUARD_IPV6=on
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=*********************************
+      - WIREGUARD_ADDRESSES=10.64.91.149/32,fc00:bbbb:bbbb:bb01::1:5b94/128
+      - WIREGUARD_DNS=10.64.0.1
+      - SERVER_CITIES="Chicago IL"     
+    networks:
+      frontend_outside:
+        ipv4_address: 10.0.0.6
+      internal:
+        ipv4_address: 172.21.0.100
+      frontend_internal:
+      
+  iptv-proxy:
+    image: pierro777/iptv-proxy
+    container_name: iptv-proxy
+    restart: unless-stopped
+    environment:
+      - HOSTNAME=172.21.0.100
+      - USER=******
+      - PASSWORD=*******
+      - M3U_URL=*****************************
+      - PORT=8099
+    depends_on:
+      gluetun:
+          condition: service_healthy
+    network_mode: service:gluetun
+    
+  firefox:
+    image: lscr.io/linuxserver/firefox:latest
+    container_name: firefox
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - TZ=America/Chicago
+      - DISABLE_IPV6=false
+      - PUID=1000
+      - PGID=1000
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /docker/encrypted/firefox:/config:rw
+    shm_size: "1gb"
+    depends_on:
+      - gluetun
+    network_mode: service:gluetun
+
+  threadfin:
+    image: fyb3roptik/threadfin:latest-nvidia
+    container_name: threadfin
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - TZ=America/Chicago
+      - THREADFIN_DEBUG=0
+      - THREADFIN_BRANCH=main
+      - THREADFIN_UID=0
+      - THREADFIN_USER=root
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /tmp/ramdisk:/tmp/threadfin:rw
+      - /docker/encrypted/threadfin/conf:/home/threadfin/conf:rw
+    ports:
+      - "34400:34400"
+    depends_on:
+      - gluetun
+      - iptv-proxy
+    networks:
+      - frontend_internal
+    
+  sabnzbd:
+    container_name: sabnzbd
+    image: lscr.io/linuxserver/sabnzbd:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - HAS_IPV6=true
+    volumes:
+      - /docker/encrypted/sabnzbd:/config
+      - /downloads/encrypted/sabnzbd/complete:/completed-downloads
+      - /downloads/encrypted/sabnzbd/incomplete:/incomplete-downloads
+    depends_on:
+      - gluetun
+    network_mode: service:gluetun
+    
+  qbittorrent:
+    container_name: qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - WEBUI_PORT=8081
+    volumes:
+      - /docker/encrypted/qbittorrent:/config:rw
+      - /downloads/encrypted:/downloads:rw
+    depends_on:
+      - gluetun
+    network_mode: service:gluetun
+
+  prowlarr:
+    container_name: prowlarr
+    image: ghcr.io/linuxserver/prowlarr:develop
+    restart: unless-stopped
+    environment:
+      - PGID=1000
+      - TZ=America/Chicago
+      - PUID=1000
+    volumes:
+      - /docker/encrypted/prowlarr/config:/config:rw
+    depends_on:
+      - gluetun
+    network_mode: service:gluetun
+    
+networks:
+  internal:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/24
+  frontend_outside:
+     external: true
+  frontend_internal:
+     external: true

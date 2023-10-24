@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  plex1:
+    image: linuxserver/plex:latest
+    container_name: plex1
+    runtime: nvidia
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - VERSION=docker
+      - PLEX_CLAIM='claim-***********************'
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - /docker/encrypted/plex/plex1:/config
+      - /storage/encrypted/video:/media
+      - /tmp/ramdisk/plex1:/transcoder
+    ports:
+      - 34410:34400
+    restart: unless-stopped
+    networks:
+      - frontend_internal
+      - backend_internal
+networks:
+  backend_internal:
+     external: true
+  frontend_internal:
+     external: true
