@@ -7,7 +7,7 @@ services:
     privileged: true
     networks:
       internal:
-      outside:
+      external:
           ipv4_address: 10.0.0.4
   swag:
     image: ghcr.io/linuxserver/swag:latest
