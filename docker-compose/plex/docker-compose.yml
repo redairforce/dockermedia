@@ -14,6 +14,9 @@ services:
       - /docker/encrypted/plex/plex1:/config
       - /storage/encrypted/video:/media
       - /tmp/ramdisk/plex1:/transcoder
+    devices:
+      - /dev/dri:/dev/dri
+
     ports:
       - 34410:34400
     restart: unless-stopped
